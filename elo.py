@@ -1,4 +1,5 @@
 import pandas as pd
+import json
 from collections import defaultdict, deque
 
 df = pd.read_csv('data/clean_tennis.csv')
@@ -54,7 +55,31 @@ for c, v in cols.items():
 
 df.to_csv('data/tennis_elo.csv', index=False)
 
+# --- Accuracy check ---
 ev = df[df['Date'].dt.year >= 2005].copy()
 won = ev['Winner'] == ev['Player_1']
-print("Blended Elo:", round(((ev['Blend_1'] > ev['Blend_2']) == won).mean(), 4))
-print("Form alone: ", round(((ev['Form_1'] > ev['Form_2']) == won).mean(), 4))
+print("Blended Elo accuracy:", round(((ev['Blend_1'] > ev['Blend_2']) == won).mean(), 4))
+
+# --- Save final state for the live predictor ---
+# df is sorted chronologically, so the last write per player is their latest.
+latest = {}
+for row in df.itertuples(index=False):
+    latest[row.Player_1] = {'rank': int(row.Rank_1), 'date': str(row.Date.date())}
+    latest[row.Player_2] = {'rank': int(row.Rank_2), 'date': str(row.Date.date())}
+
+state = {}
+for player in general:
+    state[player] = {
+        'general': general[player],
+        'hard':   surface.get('Hard',  {}).get(player, 1500.0),
+        'clay':   surface.get('Clay',  {}).get(player, 1500.0),
+        'grass':  surface.get('Grass', {}).get(player, 1500.0),
+        'form':   sum(recent[player]) / len(recent[player]) if recent[player] else 0.5,
+        'rank':   latest.get(player, {}).get('rank', 500),
+        'last_date': latest.get(player, {}).get('date', None),
+    }
+
+with open('data/elo_state.json', 'w') as f:
+    json.dump(state, f)
+
+print(f"Saved state for {len(state)} players")

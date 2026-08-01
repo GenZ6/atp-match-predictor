@@ -59,3 +59,6 @@ print(test.groupby(bins, observed=True).agg(
     predicted=('proba', 'mean'),
     actual=('y', 'mean'),
     n=('y', 'size')).round(3))
+import joblib
+joblib.dump({'model': model, 'scaler': scaler, 'features': FEATURES}, 'data/model.pkl')
+print("Saved model")
